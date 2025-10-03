@@ -105,12 +105,14 @@ Devuelve únicamente un JSON válido con exactamente dos listas:
         max_tokens=6000,
     )
 
-    raw_content = response.choices[0].message.content
-    print("DEBUG RAW CONTENT:", raw_content)
+    raw_content = response.choices[0].message.content.strip()
+
+    # 🧹 Eliminar backticks o etiquetas de código que rompen el JSON
+    if raw_content.startswith("```"):
+        raw_content = raw_content.strip("`")
+        raw_content = raw_content.replace("json", "", 1).strip()
 
     try:
         return json.loads(raw_content)
     except Exception as e:
         raise RuntimeError(f"No se pudo parsear JSON: {e}\nRespuesta cruda: {raw_content}")
-
-
