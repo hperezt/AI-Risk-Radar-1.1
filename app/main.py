@@ -1,15 +1,20 @@
-# app/main.py
-import logging
+#import logging
 import traceback
 from fastapi import FastAPI, File, UploadFile, Form
 from fastapi.responses import JSONResponse
 
+# 📄 Parsers existentes para PDF, DOCX y TXT
 from app.parsers import (
     extract_text_from_pdf,
     extract_text_from_docx,
     extract_text_from_txt,
 )
+
+# 🧠 Función que manda texto al modelo (ya existente)
 from app.risk_engine import generate_risks
+
+# 🧩 NUEVO: función modular de chunking
+from app.utils.chunking import split_into_chunks  
 
 logger = logging.getLogger("uvicorn.error")
 app = FastAPI(debug=True)
@@ -27,15 +32,20 @@ async def analyze_document(
     file: UploadFile = File(...),
     context: str = Form(""),
     lang: str = Form("es"),
+    longdoc: bool = Form(False),  # 🆕 Nuevo flag para activar modo long doc
 ):
     try:
         filename = (file.filename or "").lower()
         file_bytes = await file.read()
 
-        # Detectar tipo por extensión y procesar
+        # -----------------------------------------
+        # 1) EXTRACCIÓN DE TEXTO (ya lo tienes)
+        # -----------------------------------------
         if filename.endswith(".pdf"):
             text_per_page = extract_text_from_pdf(file_bytes)
-            joined_text = "\n---\n".join([f"[Página {p['page']}]\n{p['text']}" for p in text_per_page])
+            joined_text = "\n---\n".join(
+                [f"[Página {p['page']}]\n{p['text']}" for p in text_per_page]
+            )
         elif filename.endswith(".docx"):
             joined_text = extract_text_from_docx(file_bytes)
         elif filename.endswith(".txt"):
@@ -49,7 +59,6 @@ async def analyze_document(
                 status_code=400,
             )
 
-        # Validación mínima para detectar parser vacío
         if not joined_text or len(joined_text) < 100:
             return JSONResponse(
                 content={
@@ -59,16 +68,39 @@ async def analyze_document(
                 status_code=422,
             )
 
-        # Generar riesgos con GPT
-        result = generate_risks(joined_text, context=context, lang=lang)
+        # -----------------------------------------
+        # 2) ANÁLISIS DE RIESGOS
+        # -----------------------------------------
 
-        # Añadir metadatos internos para debugging
-        result["_debug"] = {
-            "filename": filename,
-            "chars": len(joined_text),
-        }
+        if longdoc:
+            # 🆕 MODO LONG DOC: dividir en chunks de 3000 tokens
+            chunks = split_into_chunks(joined_text, max_tokens=3000)
 
-        return JSONResponse(content=result)
+            results = []
+            for i, chunk in enumerate(chunks):
+                result = generate_risks(chunk, context=context, lang=lang)
+                result["_debug"] = {
+                    "filename": filename,
+                    "chunk_id": i + 1,
+                    "chunk_chars": len(chunk),
+                }
+                results.append(result)
+
+            final_result = {"chunks": results}
+
+        else:
+            # 🔁 MODO NORMAL (igual que antes)
+            result = generate_risks(joined_text, context=context, lang=lang)
+            result["_debug"] = {
+                "filename": filename,
+                "chars": len(joined_text),
+            }
+            final_result = result
+
+        # -----------------------------------------
+        # 3) RESPUESTA FINAL
+        # -----------------------------------------
+        return JSONResponse(content=final_result)
 
     except Exception as e:
         logger.error(f"Error en /analyze: {str(e)}")

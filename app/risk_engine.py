@@ -1,60 +1,63 @@
-# app/risk_engine.py
-import os
-import json
-from dotenv import load_dotenv
-import openai
-
-# Cargar variables de entorno (.env o Render Environment)
-load_dotenv()
-
-MODEL_NAME = os.getenv("MODEL_NAME", "gpt-4")
-API_KEY = os.getenv("OPENAI_API_KEY")
-USE_MOCK = False
-
-if not API_KEY:
-    raise RuntimeError("OPENAI_API_KEY no está definida. Añádela en Render > Environment")
-
-# Configurar API Key para cliente viejo (openai<=0.28.0)
-openai.api_key = API_KEY
-
-
 def generate_risks(text: str, context: str = "", lang: str = "es") -> dict:
     """
     Genera riesgos a partir del texto de un documento usando GPT.
     Devuelve un JSON con riesgos intuitivos y contraintuitivos.
     """
+
     if USE_MOCK:
         return {
             "intuitive_risks": [
-                {"risk": "Retraso por clima", "justification": "Condiciones adversas", "countermeasure": "Plan de contingencia", "page": 1, "evidence": "Clima en zona de obra"},
+                {
+                    "risk": "Retraso por clima",
+                    "justification": "Condiciones adversas",
+                    "countermeasure": "Plan de contingencia",
+                    "page": 1,
+                    "evidence": "Clima en zona de obra",
+                },
             ],
             "counterintuitive_risks": [
-                {"risk": "Exceso de presupuesto por ahorro mal planificado", "justification": "Decisiones apresuradas", "countermeasure": "Revisión independiente", "page": 2, "evidence": "Reportes financieros"},
+                {
+                    "risk": "Exceso de presupuesto por ahorro mal planificado",
+                    "justification": "Decisiones apresuradas",
+                    "countermeasure": "Revisión independiente",
+                    "page": 2,
+                    "evidence": "Reportes financieros",
+                },
             ],
         }
 
+    # 🧠 Prompt optimizado para long doc con grupo interdisciplinario
     prompt = f"""
 Idioma de salida: {lang}
 
-Analiza el siguiente documento de proyecto de infraestructura y genera:
-- 5 riesgos intuitivos
-- 5 riesgos contraintuitivos
+Actúa como un grupo interdisciplinario compuesto por:
+- Ingenieros civiles
+- Ingenieros ferroviarios
+- Abogados especialistas en derecho de infraestructura y transporte
+- Expertos en compras y logística
 
-Documento (truncado a 18000 caracteres):
-{text[:18000]}
+Analiza el siguiente fragmento de un documento de infraestructura.
+Identifica todos los riesgos relevantes que aparezcan en este texto, sin límite de cantidad.
 
-Contexto adicional:
+Criterios:
+- Considera como riesgo lo que afecte TIEMPO, COSTO, EJECUCIÓN, SEGURIDAD o ACEPTACIÓN SOCIAL/REGULATORIA.
+- Clasifica en dos listas: "intuitive_risks" y "counterintuitive_risks".
+- Cada lista puede tener de 0 hasta N elementos.
+- No repitas riesgos genéricos. Analiza únicamente lo que esté en este fragmento.
+- Por cada riesgo incluye:
+  - "risk": enunciado breve
+  - "justification": por qué es un riesgo en este contexto
+  - "countermeasure": cómo mitigarlo
+  - "page": número de página o sección si se puede inferir
+  - "evidence": cita textual breve que lo respalde
+
+Texto analizado:
+{text[:16000]}
+
+Contexto adicional (si existe):
 {context}
 
-Devuelve solo un JSON válido con:
-- "intuitive_risks": lista de 5 objetos
-- "counterintuitive_risks": lista de 5 objetos
-Cada objeto debe incluir:
-- "risk"
-- "justification"
-- "countermeasure"
-- "page"
-- "evidence"
+Devuelve únicamente un JSON válido.
 """
 
     response = openai.ChatCompletion.create(
@@ -62,7 +65,11 @@ Cada objeto debe incluir:
         messages=[
             {
                 "role": "system",
-                "content": "Eres un analista de riesgos experto en proyectos de infraestructura.",
+                "content": (
+                    "Eres un analista de riesgos experto en proyectos de infraestructura. "
+                    "Trabajas junto con un equipo interdisciplinario (ingeniería civil, ingeniería ferroviaria, "
+                    "abogados, compras y logística) para evaluar riesgos desde múltiples perspectivas."
+                ),
             },
             {"role": "user", "content": prompt},
         ],
@@ -76,4 +83,3 @@ Cada objeto debe incluir:
         raise RuntimeError(f"No se pudo parsear JSON: {e}")
 
     return data
-
