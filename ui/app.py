@@ -86,25 +86,42 @@ if not st.session_state["authorized"]:
                 st.error(f"⚠️ Error al guardar en Google Sheets: {e}")
 
 # ==========================
-# 🔄 Función para mostrar riesgos
+# 🔄 Función para renderizar riesgos
 # ==========================
-def render_risks(df, title, icon, lang_code):
-    """Renderiza lista de riesgos con expansores y validaciones seguras"""
-    if not df.empty:
-        st.subheader(f"{icon} {title}")
-    for _, row in df.iterrows():
-        with st.expander(f"{icon} {row.get('risk', 'Riesgo sin título')}"):
-            if row.get("page") or row.get("evidence"):
-                st.markdown("**📄 Fuente del riesgo:**")
-            if row.get("page"):
-                st.markdown(f"• **Página:** {row['page']}")
-            if row.get("evidence"):
-                snippet = row["evidence"][:500]
-                st.markdown(f"• **Fragmento del texto:**\n\n> {snippet}{'...' if len(row['evidence']) > 500 else ''}")
-            st.markdown(f"**{t['columns']['justification'][lang_code]}**")
-            st.write(row.get("justification", ""))
-            st.markdown(f"**{t['columns']['countermeasure'][lang_code]}**")
-            st.write(row.get("countermeasure", ""))
+def render_risks(df, title, icon, lang_code, mode="expand"):
+    """Renderiza riesgos en dos modos: expanders narrativos o tabla analítica"""
+
+    if df.empty:
+        return
+
+    st.subheader(f"{icon} {title}")
+
+    if mode == "expand":
+        # Vista detallada con expanders
+        for _, row in df.iterrows():
+            with st.expander(f"{icon} {row.get('risk', 'Riesgo sin título')}"):
+                if row.get("page") or row.get("evidence"):
+                    st.markdown("**📄 Fuente del riesgo:**")
+                if row.get("page"):
+                    st.markdown(f"• **Página:** {row['page']}")
+                if row.get("evidence"):
+                    snippet = row["evidence"][:500]
+                    st.markdown(f"• **Fragmento del texto:**\n\n> {snippet}{'...' if len(row['evidence']) > 500 else ''}")
+                st.markdown(f"**{t['columns']['justification'][lang_code]}**")
+                st.write(row.get("justification", ""))
+                st.markdown(f"**{t['columns']['countermeasure'][lang_code]}**")
+                st.write(row.get("countermeasure", ""))
+    else:
+        # Vista tipo tabla
+        df_table = df.rename(columns={
+            "risk": "🟠 Riesgo",
+            "justification": "📖 Justificación",
+            "countermeasure": "🛠️ Contramedida",
+            "evidence": "📄 Evidencia",
+            "page": "📑 Página"
+        })
+        st.dataframe(df_table, use_container_width=True)
+
 
 # ==========================
 # 🚀 Aplicación principal
@@ -116,6 +133,14 @@ if st.session_state["authorized"]:
     uploaded_file = st.file_uploader(t["file_label"][lang_code], type=["txt", "pdf", "docx"])
     context = st.text_input(t["context_label"][lang_code], placeholder=t["context_placeholder"][lang_code])
 
+    # 🔀 Toggle de vista expandida/tabla
+    view_mode = st.radio(
+        "👁️ Selecciona vista:",
+        options=["expand", "table"],
+        format_func=lambda x: "Vista expandida" if x == "expand" else "Vista en tabla",
+        horizontal=True
+    )
+
     # 🆕 Checkbox para activar modo longdoc
     longdoc_mode = st.checkbox("📖 Procesar como documento largo (chunked)", value=False)
 
@@ -125,38 +150,71 @@ if st.session_state["authorized"]:
         else:
             with st.spinner(t["analyzing"][lang_code]):
                 files = {"file": (uploaded_file.name, uploaded_file.getvalue(), uploaded_file.type)}
-                # 🆕 Incluimos 'longdoc' en el payload
                 data = {"context": context, "lang": lang_code, "longdoc": longdoc_mode}
+
                 try:
                     r = requests.post(API_URL, files=files, data=data, timeout=120)
                     r.raise_for_status()
-
                     result = r.json()
                     st.success(t["analysis_done"][lang_code])
 
-                    # Modo normal → listas de riesgos directas
+                    # 👉 Modo normal → listas de riesgos directas
                     if "intuitive_risks" in result or "counterintuitive_risks" in result:
                         df1 = pd.DataFrame(result.get("intuitive_risks", []))
-                        render_risks(df1, t["intuitive_risks"][lang_code], "🔸", lang_code)
+                        render_risks(df1, t["intuitive_risks"][lang_code], "🔸", lang_code, mode=view_mode)
+                        if not df1.empty:
+                            csv1 = df1.to_csv(index=False).encode("utf-8")
+                            st.download_button(
+                                label="⬇️ Descargar riesgos intuitivos (CSV)",
+                                data=csv1,
+                                file_name="riesgos_intuitivos.csv",
+                                mime="text/csv",
+                            )
 
                         df2 = pd.DataFrame(result.get("counterintuitive_risks", []))
-                        render_risks(df2, t["counterintuitive_risks"][lang_code], "🔹", lang_code)
+                        render_risks(df2, t["counterintuitive_risks"][lang_code], "🔹", lang_code, mode=view_mode)
+                        if not df2.empty:
+                            csv2 = df2.to_csv(index=False).encode("utf-8")
+                            st.download_button(
+                                label="⬇️ Descargar riesgos contraintuitivos (CSV)",
+                                data=csv2,
+                                file_name="riesgos_contraintuitivos.csv",
+                                mime="text/csv",
+                            )
 
                         dbg = result.get("_debug")
                         if dbg:
                             st.caption(f"DEBUG · chars={dbg.get('chars')} · file={dbg.get('filename')}")
 
-                    # Modo longdoc → procesar chunks
+                    # 👉 Modo longdoc → procesar chunks
                     elif "chunks" in result:
                         for chunk in result["chunks"]:
                             st.markdown("---")
-                            st.caption(f"📑 Chunk {chunk['_debug']['chunk_id']} · {chunk['_debug']['chunk_chars']} chars")
+                            st.caption(
+                                f"📑 Chunk {chunk['_debug']['chunk_id']} · {chunk['_debug']['chunk_chars']} chars"
+                            )
 
                             df1 = pd.DataFrame(chunk.get("intuitive_risks", []))
-                            render_risks(df1, t["intuitive_risks"][lang_code], "🔸", lang_code)
+                            render_risks(df1, t["intuitive_risks"][lang_code], "🔸", lang_code, mode=view_mode)
+                            if not df1.empty:
+                                csv1 = df1.to_csv(index=False).encode("utf-8")
+                                st.download_button(
+                                    label=f"⬇️ Descargar riesgos intuitivos (Chunk {chunk['_debug']['chunk_id']})",
+                                    data=csv1,
+                                    file_name=f"riesgos_intuitivos_chunk{chunk['_debug']['chunk_id']}.csv",
+                                    mime="text/csv",
+                                )
 
                             df2 = pd.DataFrame(chunk.get("counterintuitive_risks", []))
-                            render_risks(df2, t["counterintuitive_risks"][lang_code], "🔹", lang_code)
+                            render_risks(df2, t["counterintuitive_risks"][lang_code], "🔹", lang_code, mode=view_mode)
+                            if not df2.empty:
+                                csv2 = df2.to_csv(index=False).encode("utf-8")
+                                st.download_button(
+                                    label=f"⬇️ Descargar riesgos contraintuitivos (Chunk {chunk['_debug']['chunk_id']})",
+                                    data=csv2,
+                                    file_name=f"riesgos_contraintuitivos_chunk{chunk['_debug']['chunk_id']}.csv",
+                                    mime="text/csv",
+                                )
 
                     if result.get("source") == "modo simulado (mock)":
                         st.info(t["mock_notice"][lang_code])
