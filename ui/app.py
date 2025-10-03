@@ -114,6 +114,7 @@ def render_risks(df, title, icon, lang_code, mode="expand"):
 
     else:
         # Vista tipo tabla amigable, ancho completo y texto con salto de línea
+        # Vista tipo tabla amigable, ancho completo y texto con salto de línea
         df_table = df.rename(columns={
             "risk": "🟠 Riesgo",
             "justification": "📖 Justificación",
@@ -130,11 +131,12 @@ def render_risks(df, title, icon, lang_code, mode="expand"):
                 "🟠 Riesgo": st.column_config.TextColumn("🟠 Riesgo", width="medium", help="Descripción breve del riesgo"),
                 "📖 Justificación": st.column_config.TextColumn("📖 Justificación", width="large", help="Explicación"),
                 "🛠️ Contramedida": st.column_config.TextColumn("🛠️ Contramedida", width="large", help="Mitigación"),
-                "📑 Página": st.column_config.TextColumn("📑 Página", width="small"),
+                "📑 Página": st.column_config.NumberColumn("📑 Página", width="small", help="Número de página"),  # 👈 CORREGIDO
                 "📄 Evidencia": st.column_config.TextColumn("📄 Evidencia", width="large"),
             },
             disabled=True
         )
+
 
 # ==========================
 # 🚀 Aplicación principal
