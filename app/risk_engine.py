@@ -13,7 +13,7 @@ API_KEY = os.getenv("OPENAI_API_KEY")
 if not API_KEY:
     raise RuntimeError("OPENAI_API_KEY no está definida en .env ni en el entorno.")
 
-client = OpenAI(api_key=API_KEY)
+client = OpenAI()
 
 MODEL_NAME = os.getenv("MODEL_NAME", "gpt-4o-mini")
 USE_MOCK = False
