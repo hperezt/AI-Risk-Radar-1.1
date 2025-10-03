@@ -13,8 +13,8 @@ import gspread
 from google.oauth2 import service_account
 from translations import translations as t
 
-# ⚙️ Configuración de página (debe ir al principio)
-st.set_page_config(page_title="AI Risk Radar", layout="centered")
+# ⚙️ Configuración de página
+st.set_page_config(page_title="AI Risk Radar", layout="wide")
 
 # ==========================
 # 🌐 Config idioma
@@ -112,7 +112,7 @@ def render_risks(df, title, icon, lang_code, mode="expand"):
                 st.markdown(f"**{t['columns']['countermeasure'][lang_code]}**")
                 st.write(row.get("countermeasure", ""))
     else:
-        # Vista tipo tabla
+        # Vista tipo tabla ancha y compacta
         df_table = df.rename(columns={
             "risk": "🟠 Riesgo",
             "justification": "📖 Justificación",
@@ -120,8 +120,27 @@ def render_risks(df, title, icon, lang_code, mode="expand"):
             "evidence": "📄 Evidencia",
             "page": "📑 Página"
         })
-        st.dataframe(df_table, use_container_width=True)
 
+        st.markdown(
+            df_table.to_html(
+                index=False,
+                escape=False,
+                justify="left"
+            ).replace(
+                '<table border="1" class="dataframe">',
+                '<table style="width:100%; border-collapse:collapse; font-size:14px;">'
+            ),
+            unsafe_allow_html=True
+        )
+
+        # Botón CSV
+        csv = df.to_csv(index=False).encode("utf-8")
+        st.download_button(
+            label=f"⬇️ Descargar {title} (CSV)",
+            data=csv,
+            file_name=f"{title.replace(' ', '_').lower()}.csv",
+            mime="text/csv",
+        )
 
 # ==========================
 # 🚀 Aplicación principal
@@ -162,25 +181,9 @@ if st.session_state["authorized"]:
                     if "intuitive_risks" in result or "counterintuitive_risks" in result:
                         df1 = pd.DataFrame(result.get("intuitive_risks", []))
                         render_risks(df1, t["intuitive_risks"][lang_code], "🔸", lang_code, mode=view_mode)
-                        if not df1.empty:
-                            csv1 = df1.to_csv(index=False).encode("utf-8")
-                            st.download_button(
-                                label="⬇️ Descargar riesgos intuitivos (CSV)",
-                                data=csv1,
-                                file_name="riesgos_intuitivos.csv",
-                                mime="text/csv",
-                            )
 
                         df2 = pd.DataFrame(result.get("counterintuitive_risks", []))
                         render_risks(df2, t["counterintuitive_risks"][lang_code], "🔹", lang_code, mode=view_mode)
-                        if not df2.empty:
-                            csv2 = df2.to_csv(index=False).encode("utf-8")
-                            st.download_button(
-                                label="⬇️ Descargar riesgos contraintuitivos (CSV)",
-                                data=csv2,
-                                file_name="riesgos_contraintuitivos.csv",
-                                mime="text/csv",
-                            )
 
                         dbg = result.get("_debug")
                         if dbg:
@@ -196,25 +199,9 @@ if st.session_state["authorized"]:
 
                             df1 = pd.DataFrame(chunk.get("intuitive_risks", []))
                             render_risks(df1, t["intuitive_risks"][lang_code], "🔸", lang_code, mode=view_mode)
-                            if not df1.empty:
-                                csv1 = df1.to_csv(index=False).encode("utf-8")
-                                st.download_button(
-                                    label=f"⬇️ Descargar riesgos intuitivos (Chunk {chunk['_debug']['chunk_id']})",
-                                    data=csv1,
-                                    file_name=f"riesgos_intuitivos_chunk{chunk['_debug']['chunk_id']}.csv",
-                                    mime="text/csv",
-                                )
 
                             df2 = pd.DataFrame(chunk.get("counterintuitive_risks", []))
                             render_risks(df2, t["counterintuitive_risks"][lang_code], "🔹", lang_code, mode=view_mode)
-                            if not df2.empty:
-                                csv2 = df2.to_csv(index=False).encode("utf-8")
-                                st.download_button(
-                                    label=f"⬇️ Descargar riesgos contraintuitivos (Chunk {chunk['_debug']['chunk_id']})",
-                                    data=csv2,
-                                    file_name=f"riesgos_contraintuitivos_chunk{chunk['_debug']['chunk_id']}.csv",
-                                    mime="text/csv",
-                                )
 
                     if result.get("source") == "modo simulado (mock)":
                         st.info(t["mock_notice"][lang_code])
