@@ -71,7 +71,7 @@ conflictos contractuales o fallas operativas relevantes.
 
 Instrucciones:
 - Clasifica los riesgos en dos listas: "intuitive_risks" y "counterintuitive_risks".
-- Cada lista puede tener de 0 hasta N riesgos (no inventes ni repitas riesgos genéricos).
+- Cada lista puede tener de 0 hasta N riesgos (no inventes ni repitas riesgos genéricos, no limites el número de riesgos).
 - Considera como riesgo lo que afecte TIEMPO, COSTO, EJECUCIÓN, SEGURIDAD o ACEPTACIÓN SOCIAL/REGULATORIA.
 - Por cada riesgo incluye:
   - "risk": enunciado breve
