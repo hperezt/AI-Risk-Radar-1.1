@@ -39,7 +39,7 @@ if GCP_CREDS and SHEET_ID:
     try:
         scopes = ["https://www.googleapis.com/auth/spreadsheets"]
         data = json.loads(GCP_CREDS)
-        data["private_key"] = data["private_key"].replace("\\n", "\n")  # asegurar saltos de línea
+        data["private_key"] = data["private_key"].replace("\\n", "\n")
         creds = service_account.Credentials.from_service_account_info(data, scopes=scopes)
         client = gspread.authorize(creds)
         sheet = client.open_by_key(SHEET_ID).sheet1
@@ -81,7 +81,7 @@ if not st.session_state["authorized"]:
                     sheet.append_row([email, reason])
                 st.session_state["authorized"] = True
                 st.success("✅ Acceso concedido. Ahora puedes usar la demo.")
-                st.rerun()  # 👈 funciona en Streamlit 1.29+
+                st.rerun()
             except Exception as e:
                 st.error(f"⚠️ Error al guardar en Google Sheets: {e}")
 
@@ -116,32 +116,47 @@ if st.session_state["authorized"]:
     uploaded_file = st.file_uploader(t["file_label"][lang_code], type=["txt", "pdf", "docx"])
     context = st.text_input(t["context_label"][lang_code], placeholder=t["context_placeholder"][lang_code])
 
+    # 🆕 Checkbox para activar modo longdoc
+    longdoc_mode = st.checkbox("📖 Procesar como documento largo (chunked)", value=False)
+
     if st.button(t["analyze_button"][lang_code]):
         if not uploaded_file:
             st.warning(t["no_file_warning"][lang_code])
         else:
             with st.spinner(t["analyzing"][lang_code]):
                 files = {"file": (uploaded_file.name, uploaded_file.getvalue(), uploaded_file.type)}
-                data = {"context": context, "lang": lang_code}
+                # 🆕 Incluimos 'longdoc' en el payload
+                data = {"context": context, "lang": lang_code, "longdoc": longdoc_mode}
                 try:
                     r = requests.post(API_URL, files=files, data=data, timeout=120)
-                    r.raise_for_status()  # lanza error si no es 200
+                    r.raise_for_status()
 
                     result = r.json()
                     st.success(t["analysis_done"][lang_code])
 
-                    # 🟠 Riesgos intuitivos
-                    df1 = pd.DataFrame(result.get("intuitive_risks", []))
-                    render_risks(df1, t["intuitive_risks"][lang_code], "🔸", lang_code)
+                    # Modo normal → listas de riesgos directas
+                    if "intuitive_risks" in result or "counterintuitive_risks" in result:
+                        df1 = pd.DataFrame(result.get("intuitive_risks", []))
+                        render_risks(df1, t["intuitive_risks"][lang_code], "🔸", lang_code)
 
-                    # 🔵 Riesgos contraintuitivos
-                    df2 = pd.DataFrame(result.get("counterintuitive_risks", []))
-                    render_risks(df2, t["counterintuitive_risks"][lang_code], "🔹", lang_code)
+                        df2 = pd.DataFrame(result.get("counterintuitive_risks", []))
+                        render_risks(df2, t["counterintuitive_risks"][lang_code], "🔹", lang_code)
 
-                    # 🔍 Info debug
-                    dbg = result.get("_debug")
-                    if dbg:
-                        st.caption(f"DEBUG · chars={dbg.get('chars')} · file={dbg.get('filename')}")
+                        dbg = result.get("_debug")
+                        if dbg:
+                            st.caption(f"DEBUG · chars={dbg.get('chars')} · file={dbg.get('filename')}")
+
+                    # Modo longdoc → procesar chunks
+                    elif "chunks" in result:
+                        for chunk in result["chunks"]:
+                            st.markdown("---")
+                            st.caption(f"📑 Chunk {chunk['_debug']['chunk_id']} · {chunk['_debug']['chunk_chars']} chars")
+
+                            df1 = pd.DataFrame(chunk.get("intuitive_risks", []))
+                            render_risks(df1, t["intuitive_risks"][lang_code], "🔸", lang_code)
+
+                            df2 = pd.DataFrame(chunk.get("counterintuitive_risks", []))
+                            render_risks(df2, t["counterintuitive_risks"][lang_code], "🔹", lang_code)
 
                     if result.get("source") == "modo simulado (mock)":
                         st.info(t["mock_notice"][lang_code])

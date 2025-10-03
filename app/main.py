@@ -1,4 +1,4 @@
-#import logging
+import logging
 import traceback
 from fastapi import FastAPI, File, UploadFile, Form
 from fastapi.responses import JSONResponse
@@ -15,7 +15,10 @@ from app.risk_engine import generate_risks
 
 # 🧩 NUEVO: función modular de chunking
 from app.utils.chunking import split_into_chunks  
-
+logging.basicConfig(
+    level=logging.INFO,  # Cambia a DEBUG si quieres más detalle
+    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+)
 logger = logging.getLogger("uvicorn.error")
 app = FastAPI(debug=True)
 

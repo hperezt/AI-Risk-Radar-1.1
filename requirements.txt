@@ -23,5 +23,9 @@ google-auth==2.29.0
 oauth2client==4.1.3  # requerido por algunas versiones de gspread
 
 # Otros (si quieres agregar soporte para alemán)
-# nltk==3.8.1
-# langdetect==1.0.9
+nltk==3.8.1
+langdetect==1.0.9
+
+# Modelos e IA
+openai==0.28.0     # Cliente viejo, compatible con risk_engine.py
+tiktoken==0.6.0    # Para conteo de tokens en chunking
