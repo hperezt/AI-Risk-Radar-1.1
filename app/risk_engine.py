@@ -72,6 +72,7 @@ conflictos contractuales o fallas operativas relevantes.
 Instrucciones:
 - Clasifica los riesgos en dos listas: "intuitive_risks" y "counterintuitive_risks".
 - Cada lista puede tener de 0 hasta N riesgos (no inventes ni repitas riesgos genéricos, no limites el número de riesgos).
+- Identifica TODOS los riesgos relevantes, aunque sean más de 10. No pares después de 10. Si encuentras 30 o más, devuélvelos todos.
 - Considera como riesgo lo que afecte TIEMPO, COSTO, EJECUCIÓN, SEGURIDAD o ACEPTACIÓN SOCIAL/REGULATORIA.
 - Por cada riesgo incluye:
   - "risk": enunciado breve
@@ -88,8 +89,8 @@ Contexto adicional (si existe):
 
 Devuelve únicamente un JSON válido con exactamente dos listas:
 {{
-  "intuitive_risks": [...],
-  "counterintuitive_risks": [...]
+  "intuitive_risks": [{...}, {...}, {...}, {...}, {...}, {...}, {...}],
+  "counterintuitive_risks": [{...}, {...}, {...}, {...}]
 }}
 """
 
@@ -106,7 +107,7 @@ Devuelve únicamente un JSON válido con exactamente dos listas:
             {"role": "user", "content": prompt},
         ],
         temperature=0.3,
-        max_tokens=2000,
+        max_tokens=6000,
     )
 
     try:
