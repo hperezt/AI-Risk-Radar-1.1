@@ -3,6 +3,27 @@ from io import BytesIO
 from typing import Union, List, Dict
 import re
 
+# ==========================================
+# 🧹 Patrones de limpieza de headers/footers
+# ==========================================
+CLEAN_PATTERNS = [
+    r"\bSeite\s+\d+\b",        # "Seite 12"
+    r"\bPage\s+\d+\b",         # "Page 3"
+    r"DB InfraGO AG",          # DB InfraGO
+    r"EBA Beschluss",          # EBA documents
+    r"Planfeststellung",       # German approval docs
+]
+
+def clean_text(text: str) -> str:
+    """Elimina headers/pies de página irrelevantes sin borrar contenido real."""
+    for pattern in CLEAN_PATTERNS:
+        text = re.sub(pattern, "", text, flags=re.IGNORECASE)
+    # Normalizar espacios y saltos de línea
+    text = re.sub(r"[ \t]+", " ", text)
+    text = re.sub(r"\n{3,}", "\n\n", text)
+    return text.strip()
+
+
 # 1) PDF: usa pdfplumber
 def extract_text_from_pdf(file_bytes: Union[bytes, BytesIO]) -> List[Dict]:
     """
@@ -20,9 +41,8 @@ def extract_text_from_pdf(file_bytes: Union[bytes, BytesIO]) -> List[Dict]:
     with pdfplumber.open(bio) as pdf:
         for i, page in enumerate(pdf.pages):
             page_text = page.extract_text(x_tolerance=1.5, y_tolerance=1.5) or ""
-            page_text = re.sub(r"[ \t]+", " ", page_text)
-            page_text = re.sub(r"\n{3,}", "\n\n", page_text).strip()
-            pages.append({"page": i + 1, "text": page_text})
+            cleaned = clean_text(page_text)
+            pages.append({"page": i + 1, "text": cleaned})
 
     return pages
 
@@ -40,7 +60,8 @@ def extract_text_from_docx(file_bytes: Union[bytes, BytesIO]) -> str:
     bio = BytesIO(file_bytes) if isinstance(file_bytes, bytes) else file_bytes
     doc = Document(bio)
     paragraphs = [p.text for p in doc.paragraphs if p.text.strip()]
-    return "\n".join(paragraphs).strip()
+    joined = "\n".join(paragraphs).strip()
+    return clean_text(joined)
 
 
 # 3) TXT
@@ -59,5 +80,4 @@ def extract_text_from_txt(file_bytes: Union[bytes, BytesIO]) -> str:
     # Debug en logs de Render
     print(f"DEBUG · TXT length={len(text)} preview={text[:200]!r}")
 
-    return text
-
+    return clean_text(text)

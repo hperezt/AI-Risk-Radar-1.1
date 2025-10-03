@@ -74,6 +74,7 @@ Instrucciones:
   - "countermeasure": propuesta de mitigación
   - "page": número de página o sección si es posible inferirlo
   - "evidence": extracto textual breve que fundamenta el riesgo
+  - “Ignora encabezados, pies de página, numeración o texto irrelevante como DB InfraGO AG Seite X al generar riesgos. Solo usa contenido sustantivo.”
 
 Texto analizado:
 {text[:16000]}
