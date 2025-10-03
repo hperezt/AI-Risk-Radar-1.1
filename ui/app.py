@@ -111,8 +111,9 @@ def render_risks(df, title, icon, lang_code, mode="expand"):
                 st.write(row.get("justification", ""))
                 st.markdown(f"**{t['columns']['countermeasure'][lang_code]}**")
                 st.write(row.get("countermeasure", ""))
+
     else:
-        # Vista tipo tabla (ocupa ancho completo)
+        # Vista tipo tabla amigable, ancho completo y texto con salto de línea
         df_table = df.rename(columns={
             "risk": "🟠 Riesgo",
             "justification": "📖 Justificación",
@@ -120,7 +121,20 @@ def render_risks(df, title, icon, lang_code, mode="expand"):
             "evidence": "📄 Evidencia",
             "page": "📑 Página"
         })
-        st.dataframe(df_table, use_container_width=True)
+
+        st.data_editor(
+            df_table,
+            use_container_width=True,
+            hide_index=True,
+            column_config={
+                "🟠 Riesgo": st.column_config.TextColumn("🟠 Riesgo", width="medium", help="Descripción breve del riesgo"),
+                "📖 Justificación": st.column_config.TextColumn("📖 Justificación", width="large", help="Explicación"),
+                "🛠️ Contramedida": st.column_config.TextColumn("🛠️ Contramedida", width="large", help="Mitigación"),
+                "📑 Página": st.column_config.TextColumn("📑 Página", width="small"),
+                "📄 Evidencia": st.column_config.TextColumn("📄 Evidencia", width="large"),
+            },
+            disabled=True
+        )
 
 # ==========================
 # 🚀 Aplicación principal

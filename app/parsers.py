@@ -4,21 +4,10 @@ from typing import Union, List, Dict
 import re
 
 # ==========================================
-# 🧹 Patrones de limpieza de headers/footers
+# 🧹 Limpieza mínima (solo espacios/saltos)
 # ==========================================
-CLEAN_PATTERNS = [
-    r"\bSeite\s+\d+\b",        # "Seite 12"
-    r"\bPage\s+\d+\b",         # "Page 3"
-    r"DB InfraGO AG",          # DB InfraGO
-    r"EBA Beschluss",          # EBA documents
-    r"Planfeststellung",       # German approval docs
-]
-
 def clean_text(text: str) -> str:
-    """Elimina headers/pies de página irrelevantes sin borrar contenido real."""
-    for pattern in CLEAN_PATTERNS:
-        text = re.sub(pattern, "", text, flags=re.IGNORECASE)
-    # Normalizar espacios y saltos de línea
+    """Normaliza espacios y saltos de línea sin borrar contenido."""
     text = re.sub(r"[ \t]+", " ", text)
     text = re.sub(r"\n{3,}", "\n\n", text)
     return text.strip()
