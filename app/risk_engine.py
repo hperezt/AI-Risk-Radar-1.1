@@ -2,24 +2,21 @@
 
 import os
 import json
-import openai
 from dotenv import load_dotenv
+from openai import OpenAI
 
-# ------------------------------------------------
-# Cargar variables de entorno (.env en local, Render en producción)
-# ------------------------------------------------
+# Cargar .env
 load_dotenv()
 
-# Configuración de modelo y API
-MODEL_NAME = os.getenv("MODEL_NAME", "gpt-4o-mini")   # Modelo por defecto si no está definido
-API_KEY = os.getenv("OPENAI_API_KEY")                 # Clave de OpenAI
-USE_MOCK = False                                      # Modo simulado para pruebas offline
-
+# Inicializar cliente con la clave
+API_KEY = os.getenv("OPENAI_API_KEY")
 if not API_KEY:
-    raise RuntimeError("OPENAI_API_KEY no está definida. Añádela en .env o en Render > Environment")
+    raise RuntimeError("OPENAI_API_KEY no está definida en .env ni en el entorno.")
 
-# Configurar API Key (cliente viejo <=0.28.0)
-openai.api_key = API_KEY
+client = OpenAI(api_key=API_KEY)
+
+MODEL_NAME = os.getenv("MODEL_NAME", "gpt-4o-mini")
+USE_MOCK = False
 
 
 def generate_risks(text: str, context: str = "", lang: str = "es") -> dict:
@@ -29,7 +26,6 @@ def generate_risks(text: str, context: str = "", lang: str = "es") -> dict:
     """
 
     if USE_MOCK:
-        # 🔄 Modo simulado para pruebas locales
         return {
             "intuitive_risks": [
                 {
@@ -51,7 +47,7 @@ def generate_risks(text: str, context: str = "", lang: str = "es") -> dict:
             ],
         }
 
-    # 🧠 Prompt interdisciplinario optimizado para long doc
+    # Prompt interdisciplinario
     prompt = f"""
 Comentario: Este es un ejercicio de análisis asistido por inteligencia artificial. 
 El objetivo es evaluar cómo un modelo LLM puede colaborar con expertos humanos para 
@@ -62,8 +58,6 @@ Actúas como un comité interdisciplinario compuesto por:
 - Ingenieros especializados en planificación y ejecución de proyectos de infraestructura ferroviaria en Europa.
 - Abogados expertos en derecho de infraestructura y normativa aplicable en Alemania.
 - Consultores y analistas con experiencia en evaluación de riesgos en el sector ferroviario alemán.
-
-Piensa como si estos perfiles discutieran en conjunto cada riesgo y llegaran a un consenso argumentado.
 
 Tu tarea es leer un FRAGMENTO de un documento técnico (no todo el documento completo) 
 y detectar riesgos de planificación que puedan generar retrasos, sobrecostos, 
@@ -94,7 +88,8 @@ Devuelve únicamente un JSON válido con exactamente dos listas:
 }}
 """
 
-    response = openai.ChatCompletion.create(
+    # Llamada a la API moderna
+    response = client.chat.completions.create(
         model=MODEL_NAME,
         messages=[
             {
@@ -110,10 +105,12 @@ Devuelve únicamente un JSON válido con exactamente dos listas:
         max_tokens=6000,
     )
 
-    try:
-        data = json.loads(response["choices"][0]["message"]["content"])
-    except Exception as e:
-        raise RuntimeError(f"No se pudo parsear JSON: {e}")
+    raw_content = response.choices[0].message.content
+    print("DEBUG RAW CONTENT:", raw_content)
 
-    return data
+    try:
+        return json.loads(raw_content)
+    except Exception as e:
+        raise RuntimeError(f"No se pudo parsear JSON: {e}\nRespuesta cruda: {raw_content}")
+
 

@@ -6,7 +6,6 @@ httpx==0.28.1
 typing-extensions>=4.8.0
 python-dotenv==1.0.1
 python-multipart==0.0.20
-openai==0.28.0
 
 # Frontend
 streamlit==1.47.0
@@ -27,5 +26,5 @@ nltk==3.8.1
 langdetect==1.0.9
 
 # Modelos e IA
-openai==0.28.0     # Cliente viejo, compatible con risk_engine.py
+openai==1.42.0    #  compatible con risk_engine.py
 tiktoken>=0.11.0   # Para conteo de tokens en chunking
