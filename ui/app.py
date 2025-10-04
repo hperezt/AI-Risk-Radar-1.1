@@ -113,32 +113,6 @@ def render_risks(df, title, icon, lang_code, mode="expand"):
                 st.write(row.get("countermeasure", ""))
 
     else:
-        # Vista tipo tabla amigable, ancho completo y texto con salto de línea
-    def render_risks(df, title, icon, lang_code, mode="expand"):
-    """Renderiza riesgos en dos modos: expanders narrativos o tabla analítica"""
-
-    if df.empty:
-        return
-
-    st.subheader(f"{icon} {title}")
-
-    if mode == "expand":
-        # Vista detallada con expanders
-        for _, row in df.iterrows():
-            with st.expander(f"{icon} {row.get('risk', 'Riesgo sin título')}"):
-                if row.get("page") or row.get("evidence"):
-                    st.markdown("**📄 Fuente del riesgo:**")
-                if row.get("page"):
-                    st.markdown(f"• **Página:** {row['page']}")
-                if row.get("evidence"):
-                    snippet = row["evidence"][:500]
-                    st.markdown(f"• **Fragmento del texto:**\n\n> {snippet}{'...' if len(row['evidence']) > 500 else ''}")
-                st.markdown(f"**{t['columns']['justification'][lang_code]}**")
-                st.write(row.get("justification", ""))
-                st.markdown(f"**{t['columns']['countermeasure'][lang_code]}**")
-                st.write(row.get("countermeasure", ""))
-
-    else:
         # Vista tipo tabla global con wrapping y ancho máximo
         df_table = df.rename(columns={
             "risk": "🟠 Riesgo",
@@ -165,8 +139,6 @@ def render_risks(df, title, icon, lang_code, mode="expand"):
             mime="text/csv",
             key=f"csv_{title}_{lang_code}"
         )
-
-
 
 # ==========================
 # 🚀 Aplicación principal
@@ -207,31 +179,9 @@ if st.session_state["authorized"]:
                     if "intuitive_risks" in result or "counterintuitive_risks" in result:
                         df1 = pd.DataFrame(result.get("intuitive_risks", []))
                         render_risks(df1, t["intuitive_risks"][lang_code], "🔸", lang_code, mode=view_mode)
-                        if not df1.empty:
-                            csv1 = df1.to_csv(index=False).encode("utf-8")
-                            st.download_button(
-                                label="⬇️ Descargar riesgos intuitivos (CSV)",
-                                data=csv1,
-                                file_name="riesgos_intuitivos.csv",
-                                mime="text/csv",
-                                key="csv_intuitivos_normal"
-                            )
 
                         df2 = pd.DataFrame(result.get("counterintuitive_risks", []))
                         render_risks(df2, t["counterintuitive_risks"][lang_code], "🔹", lang_code, mode=view_mode)
-                        if not df2.empty:
-                            csv2 = df2.to_csv(index=False).encode("utf-8")
-                            st.download_button(
-                                label="⬇️ Descargar riesgos contraintuitivos (CSV)",
-                                data=csv2,
-                                file_name="riesgos_contraintuitivos.csv",
-                                mime="text/csv",
-                                key="csv_contra_normal"
-                            )
-
-                        dbg = result.get("_debug")
-                        if dbg:
-                            st.caption(f"DEBUG · chars={dbg.get('chars')} · file={dbg.get('filename')}")
 
                     # 👉 Modo longdoc → procesar todos los chunks en una sola tabla global
                     elif "chunks" in result:
@@ -248,28 +198,8 @@ if st.session_state["authorized"]:
                         render_risks(df1, t["intuitive_risks"][lang_code], "🔸", lang_code, mode=view_mode)
                         render_risks(df2, t["counterintuitive_risks"][lang_code], "🔹", lang_code, mode=view_mode)
 
-                        if not df1.empty:
-                            csv1 = df1.to_csv(index=False).encode("utf-8")
-                            st.download_button(
-                                label="⬇️ Descargar riesgos intuitivos (CSV)",
-                                data=csv1,
-                                file_name="riesgos_intuitivos.csv",
-                                mime="text/csv",
-                                key="csv_intuitivos_longdoc"
-                            )
-
-                        if not df2.empty:
-                            csv2 = df2.to_csv(index=False).encode("utf-8")
-                            st.download_button(
-                                label="⬇️ Descargar riesgos contraintuitivos (CSV)",
-                                data=csv2,
-                                file_name="riesgos_contraintuitivos.csv",
-                                mime="text/csv",
-                                key="csv_contra_longdoc"
-                            )
-
-                        if result.get("source") == "modo simulado (mock)":
-                            st.info(t["mock_notice"][lang_code])
+                    if result.get("source") == "modo simulado (mock)":
+                        st.info(t["mock_notice"][lang_code])
 
                 except requests.exceptions.RequestException as e:
                     st.error(t["error"]["network"][lang_code] + f": {e}")
