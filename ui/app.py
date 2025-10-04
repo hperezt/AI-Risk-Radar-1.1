@@ -114,7 +114,32 @@ def render_risks(df, title, icon, lang_code, mode="expand"):
 
     else:
         # Vista tipo tabla amigable, ancho completo y texto con salto de línea
-        # Vista tipo tabla amigable, ancho completo y texto con salto de línea
+    def render_risks(df, title, icon, lang_code, mode="expand"):
+    """Renderiza riesgos en dos modos: expanders narrativos o tabla analítica"""
+
+    if df.empty:
+        return
+
+    st.subheader(f"{icon} {title}")
+
+    if mode == "expand":
+        # Vista detallada con expanders
+        for _, row in df.iterrows():
+            with st.expander(f"{icon} {row.get('risk', 'Riesgo sin título')}"):
+                if row.get("page") or row.get("evidence"):
+                    st.markdown("**📄 Fuente del riesgo:**")
+                if row.get("page"):
+                    st.markdown(f"• **Página:** {row['page']}")
+                if row.get("evidence"):
+                    snippet = row["evidence"][:500]
+                    st.markdown(f"• **Fragmento del texto:**\n\n> {snippet}{'...' if len(row['evidence']) > 500 else ''}")
+                st.markdown(f"**{t['columns']['justification'][lang_code]}**")
+                st.write(row.get("justification", ""))
+                st.markdown(f"**{t['columns']['countermeasure'][lang_code]}**")
+                st.write(row.get("countermeasure", ""))
+
+    else:
+        # Vista tipo tabla global con wrapping y ancho máximo
         df_table = df.rename(columns={
             "risk": "🟠 Riesgo",
             "justification": "📖 Justificación",
@@ -123,19 +148,24 @@ def render_risks(df, title, icon, lang_code, mode="expand"):
             "page": "📑 Página"
         })
 
-        st.data_editor(
-            df_table,
-            use_container_width=True,
-            hide_index=True,
-            column_config={
-                "🟠 Riesgo": st.column_config.TextColumn("🟠 Riesgo", width="medium", help="Descripción breve del riesgo"),
-                "📖 Justificación": st.column_config.TextColumn("📖 Justificación", width="large", help="Explicación"),
-                "🛠️ Contramedida": st.column_config.TextColumn("🛠️ Contramedida", width="large", help="Mitigación"),
-                "📑 Página": st.column_config.NumberColumn("📑 Página", width="small", help="Número de página"),  # 👈 CORREGIDO
-                "📄 Evidencia": st.column_config.TextColumn("📄 Evidencia", width="large"),
-            },
-            disabled=True
+        # Forzar wrapping en celdas largas
+        styled = df_table.style.set_table_styles({
+            col: [{"selector": "td", "props": "white-space: normal; word-wrap: break-word;"}]
+            for col in df_table.columns if col in ["📖 Justificación", "🛠️ Contramedida", "📄 Evidencia"]
+        })
+
+        st.dataframe(styled, use_container_width=True, height=400)
+
+        # Botón CSV único por tabla
+        csv_data = df_table.to_csv(index=False).encode("utf-8")
+        st.download_button(
+            label=f"⬇️ Descargar {title} (CSV)",
+            data=csv_data,
+            file_name=f"{title.lower().replace(' ', '_')}.csv",
+            mime="text/csv",
+            key=f"csv_{title}_{lang_code}"
         )
+
 
 
 # ==========================
