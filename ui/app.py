@@ -14,7 +14,7 @@ from google.oauth2 import service_account
 from translations import translations as t
 
 # ⚙️ Configuración de página (debe ir al principio)
-st.set_page_config(page_title="AI Risk Radar", layout="centered")
+st.set_page_config(page_title="AI Risk Radar", layout="wide")
 
 # ==========================
 # 🌐 Config idioma
@@ -114,6 +114,8 @@ def render_risks(df, title, icon, lang_code, mode="expand"):
 
     else:
         # Vista tipo tabla global con wrapping y ancho máximo
+        # ====== Vista tipo tabla optimizada ======
+        # Renombrar columnas con íconos descriptivos
         df_table = df.rename(columns={
             "risk": "🟠 Riesgo",
             "justification": "📖 Justificación",
@@ -122,15 +124,25 @@ def render_risks(df, title, icon, lang_code, mode="expand"):
             "page": "📑 Página"
         })
 
-        # Forzar wrapping en celdas largas
-        styled = df_table.style.set_table_styles({
-            col: [{"selector": "td", "props": "white-space: normal; word-wrap: break-word;"}]
-            for col in df_table.columns if col in ["📖 Justificación", "🛠️ Contramedida", "📄 Evidencia"]
-        })
+        # 🔧 CSS global: fuerza 100% ancho y salto de línea en todas las celdas
+        st.markdown("""
+        <style>
+        div[data-testid="stDataFrame"] div[role="gridcell"] {
+            white-space: normal !important;
+            word-wrap: break-word !important;
+            overflow-wrap: break-word !important;
+            text-align: left !important;
+        }
+        .stDataFrame {
+            width: 100% !important;
+        }
+        </style>
+        """, unsafe_allow_html=True)
 
-        st.dataframe(styled, use_container_width=True, height=400)
+        # Mostrar tabla con ancho completo y autoajuste de altura
+        st.dataframe(df_table, use_container_width=True)
 
-        # Botón CSV único por tabla
+        # Botón de descarga CSV
         csv_data = df_table.to_csv(index=False).encode("utf-8")
         st.download_button(
             label=f"⬇️ Descargar {title} (CSV)",
@@ -139,6 +151,7 @@ def render_risks(df, title, icon, lang_code, mode="expand"):
             mime="text/csv",
             key=f"csv_{title}_{lang_code}"
         )
+        st.markdown("<div style='margin-top: -15px'></div>", unsafe_allow_html=True)
 
 # ==========================
 # 🚀 Aplicación principal
