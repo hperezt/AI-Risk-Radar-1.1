@@ -198,7 +198,7 @@ if st.session_state["authorized"]:
                 data = {"context": context, "lang": lang_code, "longdoc": longdoc_mode}
 
                 try:
-                    r = requests.post(API_URL, files=files, data=data, timeout=1200
+                    r = requests.post(API_URL, files=files, data=data, timeout=1200)
                     r.raise_for_status()
                     result = r.json()
                     st.success(t["analysis_done"][lang_code])
