@@ -1,5 +1,5 @@
 # ================================================
-# 🌐 AI Risk Radar – Streamlit App (Optimized v2)
+# 🌐 AI Risk Radar – Streamlit App (Optimized v5)
 # ================================================
 
 import os
@@ -36,6 +36,7 @@ API_URL = f"{BASE_URL}/analyze"
 SHEET_ID = os.environ.get("SHEET_ID")
 GCP_CREDS = os.environ.get("GCP_CREDS")
 
+sheet = None
 if GCP_CREDS and SHEET_ID:
     try:
         scopes = ["https://www.googleapis.com/auth/spreadsheets"]
@@ -45,10 +46,7 @@ if GCP_CREDS and SHEET_ID:
         client = gspread.authorize(creds)
         sheet = client.open_by_key(SHEET_ID).sheet1
     except Exception as e:
-        st.error(f"⚠️ Error al conectar con Google Sheets: {e}")
-        sheet = None
-else:
-    sheet = None
+        st.warning(f"⚠️ No se pudo conectar con Google Sheets: {e}")
 
 # ==========================
 # 🔐 Control de acceso
@@ -84,15 +82,19 @@ if not st.session_state["authorized"]:
                 st.success("✅ Acceso concedido. Ahora puedes usar la demo.")
                 st.rerun()
             except Exception as e:
-                st.error(f"⚠️ Error al guardar en Google Sheets: {e}")
+                st.warning(f"⚠️ No se pudo guardar en Google Sheets: {e}")
 
 # ==========================
 # 🔄 Función para renderizar tabla combinada
 # ==========================
 def render_combined_table(df1: pd.DataFrame, df2: pd.DataFrame, title: str, lang_code: str):
-    df1 = (df1 or pd.DataFrame()).copy()
-    df2 = (df2 or pd.DataFrame()).copy()
+    """Combina riesgos intuitivos y contraintuitivos en una sola tabla, con salto de línea y exportación a Excel."""
 
+    # Evita errores de ambigüedad
+    df1 = df1.copy() if isinstance(df1, pd.DataFrame) else pd.DataFrame()
+    df2 = df2.copy() if isinstance(df2, pd.DataFrame) else pd.DataFrame()
+
+    # Etiqueta de tipo
     if not df1.empty:
         df1["__type"] = "🔸 Intuitivo"
     if not df2.empty:
@@ -103,6 +105,7 @@ def render_combined_table(df1: pd.DataFrame, df2: pd.DataFrame, title: str, lang
         st.info("No hay datos para mostrar.")
         return
 
+    # Renombrar columnas
     rename_map = {
         "__type": "🔎 Tipo",
         "risk": "🟠 Riesgo",
@@ -112,27 +115,60 @@ def render_combined_table(df1: pd.DataFrame, df2: pd.DataFrame, title: str, lang
         "evidence": "📄 Evidencia",
     }
     combined.rename(columns={k: v for k, v in rename_map.items() if k in combined.columns}, inplace=True)
+
     ordered = [c for c in ["🔎 Tipo", "🟠 Riesgo", "📖 Justificación", "🛠️ Contramedida", "📑 Página", "📄 Evidencia"] if c in combined.columns]
     combined = combined[ordered]
 
+    # 💅 CSS para salto de línea real
     st.subheader(title)
     st.markdown("""
     <style>
-      table.wraptable { table-layout: fixed; width: 100%; border-collapse: collapse; }
-      table.wraptable th, table.wraptable td {
-        white-space: normal !important; word-wrap: break-word !important; overflow-wrap: anywhere !important;
-        text-align: left; vertical-align: top; padding: 0.5rem;
+      table.wraptable {
+        table-layout: fixed;
+        width: 100%;
+        border-collapse: collapse;
+        word-break: break-word;
       }
-      table.wraptable thead th { position: sticky; top: 0; background-color: #111; color: #fff; }
+      table.wraptable th, table.wraptable td {
+        white-space: normal !important;
+        word-wrap: break-word !important;
+        overflow-wrap: anywhere !important;
+        text-align: left;
+        vertical-align: top;
+        padding: 0.6rem;
+        line-height: 1.4;
+      }
+      table.wraptable thead th {
+        position: sticky;
+        top: 0;
+        background-color: #222;
+        color: #fff;
+      }
     </style>
     """, unsafe_allow_html=True)
 
-    st.markdown(combined.to_html(classes="wraptable", index=False, escape=False), unsafe_allow_html=True)
+    # Renderizar tabla HTML con salto de línea
+    st.markdown(
+        combined.to_html(classes="wraptable", index=False, escape=False, justify="left"),
+        unsafe_allow_html=True
+    )
 
-    # 🔽 Descargar como Excel
+    # 💾 Exportar como Excel (.xlsx) con autoajuste de ancho
     buffer = io.BytesIO()
     with pd.ExcelWriter(buffer, engine="openpyxl") as writer:
         combined.to_excel(writer, index=False, sheet_name="Riesgos")
+
+        worksheet = writer.sheets["Riesgos"]
+        for col in worksheet.columns:
+            max_length = 0
+            column = col[0].column_letter
+            for cell in col:
+                try:
+                    if cell.value:
+                        max_length = max(max_length, len(str(cell.value)))
+                except Exception:
+                    pass
+            worksheet.column_dimensions[column].width = min(max_length + 4, 60)
 
     st.download_button(
         label=f"⬇️ Descargar {title} (Excel)",
@@ -151,7 +187,6 @@ if st.session_state["authorized"]:
 
     uploaded_file = st.file_uploader(t["file_label"][lang_code], type=["txt", "pdf", "docx"])
     context = st.text_input(t["context_label"][lang_code], placeholder=t["context_placeholder"][lang_code])
-
     longdoc_mode = st.checkbox("📖 Procesar como documento largo (chunked)", value=False)
 
     if st.button(t["analyze_button"][lang_code]):
@@ -168,24 +203,24 @@ if st.session_state["authorized"]:
                     result = r.json()
                     st.success(t["analysis_done"][lang_code])
 
-                    if "intuitive_risks" in result or "counterintuitive_risks" in result:
-                        df1 = pd.DataFrame(result.get("intuitive_risks", []))
-                        df2 = pd.DataFrame(result.get("counterintuitive_risks", []))
-                        render_combined_table(df1, df2, "Riesgos combinados", lang_code)
+                    df1 = pd.DataFrame(result.get("intuitive_risks", []))
+                    df2 = pd.DataFrame(result.get("counterintuitive_risks", []))
 
-                    elif "chunks" in result:
+                    # Modo Longdoc
+                    if "chunks" in result:
                         all_intuitive, all_counter = [], []
                         for chunk in result["chunks"]:
                             all_intuitive.extend(chunk.get("intuitive_risks", []))
                             all_counter.extend(chunk.get("counterintuitive_risks", []))
                         df1 = pd.DataFrame(all_intuitive)
                         df2 = pd.DataFrame(all_counter)
-                        render_combined_table(df1, df2, "Riesgos combinados", lang_code)
+
+                    render_combined_table(df1, df2, "Riesgos combinados", lang_code)
 
                     if result.get("source") == "modo simulado (mock)":
                         st.info(t["mock_notice"][lang_code])
 
                 except requests.exceptions.RequestException as e:
-                    st.error(t["error"]["network"][lang_code] + f": {e}")
+                    st.error(f"🌐 Error de red: {e}")
                 except Exception as e:
-                    st.error(f"{t['error']['default'][lang_code]}: {e}")
+                    st.error(f"⚠️ Error inesperado: {e}")
